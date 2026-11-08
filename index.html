@@ -288,23 +288,16 @@ const assets = [
 
 const totalSize = assets.reduce((a, b) => a + b[1], 0);
 
-let progress = 0;
-let assetIndex = 0;
 let videoReady = false;
 let started = false;
 let finished = false;
 
 const $ = id => document.getElementById(id);
-function getVideoBase64() {
-  const videoUrl = '/rolled.mp4';
-  const response = UrlFetchApp.fetch(videoUrl);
-  return Utilities.base64Encode(response.getBlob().getBytes());
-}
 
 function createAssets() {
     $("asset-list").innerHTML = "";
 
-    assets.forEach(([name, size]) => {
+    assets.forEach(([name]) => {
         const row = document.createElement("div");
         row.className = "asset";
 
@@ -327,57 +320,15 @@ function setAsset(index, value) {
 
     status.textContent = value;
 
-    if (value === "DONE") status.classList.add("done");
-}
-
-function fetchVideo() {
-    google.script.run
-        .withSuccessHandler(base64 => {
-            try {
-                const binary = atob(base64.trim());
-                const bytes = new Uint8Array(binary.length);
-
-                for (let i = 0; i < binary.length; i++) {
-                    bytes[i] = binary.charCodeAt(i);
-                }
-
-                const blob = new Blob([bytes], {
-                    type: "video/mp4"
-                });
-
-                const url = URL.createObjectURL(blob);
-                const video = $("video");
-
-                video.src = url;
-
-                video.oncanplaythrough = () => {
-                    videoReady = true;
-                    finishIfReady();
-                };
-
-                video.onerror = () => {
-                    $("task").textContent = "VIDEO ERROR";
-                };
-
-                video.load();
-
-            } catch (e) {
-                $("task").textContent = "DECODING ERROR";
-                console.error(e);
-            }
-        })
-        .withFailureHandler(error => {
-            $("task").textContent = "DOWNLOAD ERROR";
-            console.error(error);
-        })
-        .getVideoBase64();
+    if (value === "DONE") {
+        status.classList.add("done");
+    }
 }
 
 function finishIfReady() {
     if (!videoReady || finished) return;
     finished = true;
 
-    progress = 100;
     $("bar").style.width = "100%";
     $("percent").textContent = "100%";
     $("task").textContent = "INSTALLATION COMPLETE";
@@ -387,7 +338,8 @@ function finishIfReady() {
     }
 
     $("downloaded").textContent =
-        totalSize.toFixed(1) + " / " + totalSize.toFixed(1) + " MB";
+        totalSize.toFixed(1) + " / " +
+        totalSize.toFixed(1) + " MB";
 
     setTimeout(() => {
         $("video-screen").style.display = "block";
@@ -397,8 +349,105 @@ function finishIfReady() {
         video.muted = false;
         video.volume = 1;
 
-        video.play().catch(console.error);
+        video.play().catch(error => {
+            console.log("Autoplay blocked:", error);
+            video.controls = true;
+        });
     }, 900);
+}
+
+// Load the actual video directly, without Google Apps Script.
+function fetchVideo() {
+    const video = $("video");
+
+    video.preload = "auto";
+    video.src = "/rolled.mp4";
+
+    video.addEventListener("canplay", () => {
+        videoReady = true;
+        finishIfReady();
+    }, { once: true });
+
+    video.addEventListener("error", () => {
+        $("task").textContent = "VIDEO LOAD ERROR";
+        console.error("Could not load video:", video.error);
+    });
+
+    video.load();
+}
+
+// Give each asset its own randomized installation time.
+async function installAssets() {
+    const durations = assets.map(([name, size]) => {
+        const base = 850 + size * 85;
+        const variation = 0.75 + Math.random() * 0.5;
+        return Math.round(base * variation);
+    });
+
+    const totalDuration = durations.reduce((a, b) => a + b, 0);
+
+    let elapsedTotal = 0;
+    let downloaded = 0;
+
+    for (let i = 0; i < assets.length; i++) {
+        const [name, size] = assets[i];
+        const duration = durations[i];
+
+        setAsset(i, "INSTALLING...");
+        $("task").textContent = name;
+
+        const startTime = performance.now();
+
+        await new Promise(resolve => {
+            const interval = setInterval(() => {
+                const elapsed = Math.min(
+                    performance.now() - startTime,
+                    duration
+                );
+
+                const fraction = elapsed / duration;
+
+                const currentProgress =
+                    (elapsedTotal + elapsed) / totalDuration;
+
+                // Keep the installation capped at 94%.
+                const percent = Math.min(
+                    94,
+                    Math.floor(currentProgress * 94)
+                );
+
+                $("bar").style.width = percent + "%";
+                $("percent").textContent = percent + "%";
+
+                const currentDownloaded =
+                    downloaded + size * fraction;
+
+                $("downloaded").textContent =
+                    currentDownloaded.toFixed(1) +
+                    " / " + totalSize.toFixed(1) + " MB";
+
+                $("speed").textContent =
+                    (Math.random() * 4 + 1).toFixed(1) + " MB/s";
+
+                if (elapsed >= duration) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
+        });
+
+        elapsedTotal += duration;
+        downloaded += size;
+
+        setAsset(i, "DONE");
+    }
+
+    // Fake installation is complete. Wait for the real video if necessary.
+    $("bar").style.width = "94%";
+    $("percent").textContent = "94%";
+    $("task").textContent = "FINALIZING GAME DATA...";
+
+    finishIfReady();
 }
 
 function startInstallation() {
@@ -410,50 +459,9 @@ function startInstallation() {
 
     createAssets();
 
-    // Fetch the real video while the fake installation runs.
+    // Both processes run simultaneously.
     fetchVideo();
-
-    const interval = setInterval(() => {
-        if (progress < 94) {
-            progress += Math.random() * 1.1 + 0.25;
-
-            if (progress > 94) progress = 94;
-
-            const shown = Math.floor(progress);
-
-            $("bar").style.width = shown + "%";
-            $("percent").textContent = shown + "%";
-
-            const count = Math.floor(
-                progress / 100 * assets.length
-            );
-
-            while (assetIndex < count) {
-                setAsset(assetIndex, "DONE");
-                assetIndex++;
-            }
-
-            if (assetIndex < assets.length) {
-                setAsset(assetIndex, "INSTALLING...");
-            }
-
-            $("task").textContent =
-                assets[Math.min(assetIndex, assets.length - 1)][0];
-
-            $("downloaded").textContent =
-                (totalSize * progress / 100).toFixed(1) +
-                " / " + totalSize.toFixed(1) + " MB";
-
-            $("speed").textContent =
-                (Math.random() * 5 + 1).toFixed(1) + " MB/s";
-        }
-
-        if (videoReady) {
-            clearInterval(interval);
-            finishIfReady();
-        }
-
-    }, 350);
+    installAssets();
 }
 
 $("start").addEventListener("click", startInstallation);
