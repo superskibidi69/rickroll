@@ -1,43 +1,463 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>You have been rickrolled!</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-        }
-        .video-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-        video {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            min-width: 100%;
-            min-height: 100%;
-            width: auto;
-            height: auto;
-            transform: translate(-50%, -50%);
-            object-fit: cover;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEON INVADERS '84 — Remastered</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: #101426;
+    color: #e7e8ed;
+    font-family: 'VT323', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+#installer {
+    width: min(760px, 100%);
+    background: #171e34;
+    border: 3px solid #4b587b;
+    box-shadow: 0 0 0 5px #0b1020, 0 20px 70px #0009;
+    padding: 25px;
+    position: relative;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    color: #91a2c6;
+    font-size: 19px;
+    border-bottom: 2px solid #354364;
+    padding-bottom: 13px;
+}
+
+.game-title {
+    text-align: center;
+    padding: 35px 5px 25px;
+}
+
+.game-title h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(18px, 4vw, 34px);
+    line-height: 1.8;
+    color: #f5d65e;
+    text-shadow: 4px 4px #a94c39, 0 0 20px #f5d65e55;
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 24px;
+    color: #65e6e0;
+    letter-spacing: 5px;
+    margin-top: 10px;
+}
+
+.pixel-art {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    font-size: 40px;
+    color: #65e6e0;
+    text-shadow: 0 0 12px #65e6e077;
+}
+
+.info {
+    background: #101629;
+    border: 1px solid #354364;
+    padding: 17px;
+    font-size: 21px;
+    line-height: 1.5;
+    color: #aab8d4;
+}
+
+.info strong {
+    color: #f5d65e;
+}
+
+#intro { text-align: center; }
+
+button {
+    background: #e5b94e;
+    color: #171e34;
+    border: 0;
+    padding: 17px 24px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    margin: 25px 0 8px;
+    box-shadow: 0 5px #9b7130;
+}
+
+button:hover {
+    background: #ffe078;
+    transform: translateY(-2px);
+}
+
+button:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px #9b7130;
+}
+
+.small {
+    color: #7785a6;
+    font-size: 18px;
+}
+
+#loading { display: none; }
+
+.section-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    color: #f5d65e;
+    margin: 24px 0 17px;
+    line-height: 1.8;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 22px;
+    margin-bottom: 8px;
+    color: #c6d3e9;
+}
+
+#percent { color: #65e6e0; }
+
+.progress-bg {
+    height: 18px;
+    background: #0c1224;
+    border: 2px solid #53638a;
+    padding: 2px;
+}
+
+#bar {
+    height: 100%;
+    width: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        #65e6e0 0px,
+        #65e6e0 12px,
+        #35a9a9 12px,
+        #35a9a9 15px
+    );
+    transition: width .25s;
+}
+
+#asset-list {
+    margin-top: 18px;
+    background: #101629;
+    border: 1px solid #354364;
+    padding: 12px;
+    height: 230px;
+    overflow: hidden;
+}
+
+.asset {
+    display: flex;
+    justify-content: space-between;
+    font-size: 19px;
+    padding: 4px 0;
+    gap: 10px;
+}
+
+.asset-name { color: #aab8d4; }
+.asset-status { color: #7382a0; }
+.asset-status.done { color: #65e6a4; }
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 18px;
+    color: #7c8aaa;
+    padding-top: 15px;
+}
+
+#video-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: black;
+    z-index: 10;
+}
+
+#video-screen video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media(max-width: 500px) {
+    #installer { padding: 15px; }
+    .game-title { padding: 25px 0 15px; }
+    #asset-list { height: 210px; }
+}
+</style>
 </head>
+
 <body>
 
-    <div class="video-container">
-        <video autoplay loop muted playsinline>
-            <source src="/rolled.mp4" type="video/mp4">
-        </video>
+<div id="installer">
+
+    <div class="game-title">
+        <h1>NEON<br>INVADERS '84</h1>
+        <div class="subtitle">REMASTERED EDITION</div>
     </div>
+
+    <div class="pixel-art">
+        <span>▲</span>
+        <span>◆</span>
+        <span>▼</span>
+        <span>◆</span>
+        <span>▲</span>
+    </div>
+
+    <div id="intro">
+
+        <div class="info">
+            <strong>NEON INVADERS '84 — REMASTERED</strong><br>
+            Version 2.4.0 / Full Edition<br>
+            Release: 2026
+        </div>
+
+        <button id="start">INSERT COIN / START</button>
+
+        <div class="small">
+            PRESS START TO INSTALL THE GAME
+        </div>
+    </div>
+
+    <div id="loading">
+
+        <div class="section-title">
+            INSTALLING GAME DATA...
+        </div>
+
+        <div class="progress-info">
+            <span id="task">Preparing installation</span>
+            <span id="percent">0%</span>
+        </div>
+
+        <div class="progress-bg">
+            <div id="bar"></div>
+        </div>
+
+        <div id="asset-list"></div>
+
+        <div class="footer">
+            <span id="downloaded">0 / 184.6 MB</span>
+            <span id="speed">-- MB/s</span>
+        </div>
+
+    </div>
+
+</div>
+
+<div id="video-screen">
+    <video id="video" playsinline></video>
+</div>
+
+<script>
+const assets = [
+    ["Arcade engine core", 8.4],
+    ["Player sprite atlas", 12.8],
+    ["Enemy sprite collection", 18.6],
+    ["Projectile animations", 6.2],
+    ["Explosion effects", 9.4],
+    ["Stage 01 — City", 14.2],
+    ["Stage 02 — Orbital", 16.8],
+    ["Stage 03 — Deep Space", 19.4],
+    ["Background textures", 21.6],
+    ["Retro sound effects", 8.3],
+    ["Music and soundtrack", 15.7],
+    ["Font and UI package", 3.4],
+    ["Collision and physics data", 7.2],
+    ["Game configuration", 2.6],
+    ["Video playback runtime", 0]
+];
+
+const totalSize = assets.reduce((a, b) => a + b[1], 0);
+
+let progress = 0;
+let assetIndex = 0;
+let videoReady = false;
+let started = false;
+let finished = false;
+
+const $ = id => document.getElementById(id);
+function getVideoBase64() {
+  const videoUrl = '/rolled.mp4';
+  const response = UrlFetchApp.fetch(videoUrl);
+  return Utilities.base64Encode(response.getBlob().getBytes());
+}
+
+function createAssets() {
+    $("asset-list").innerHTML = "";
+
+    assets.forEach(([name, size]) => {
+        const row = document.createElement("div");
+        row.className = "asset";
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "asset-name";
+        nameEl.textContent = name;
+
+        const status = document.createElement("span");
+        status.className = "asset-status";
+        status.textContent = "WAITING";
+
+        row.append(nameEl, status);
+        $("asset-list").appendChild(row);
+    });
+}
+
+function setAsset(index, value) {
+    const status = $("asset-list").children[index]
+        .querySelector(".asset-status");
+
+    status.textContent = value;
+
+    if (value === "DONE") status.classList.add("done");
+}
+
+function fetchVideo() {
+    google.script.run
+        .withSuccessHandler(base64 => {
+            try {
+                const binary = atob(base64.trim());
+                const bytes = new Uint8Array(binary.length);
+
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+
+                const blob = new Blob([bytes], {
+                    type: "video/mp4"
+                });
+
+                const url = URL.createObjectURL(blob);
+                const video = $("video");
+
+                video.src = url;
+
+                video.oncanplaythrough = () => {
+                    videoReady = true;
+                    finishIfReady();
+                };
+
+                video.onerror = () => {
+                    $("task").textContent = "VIDEO ERROR";
+                };
+
+                video.load();
+
+            } catch (e) {
+                $("task").textContent = "DECODING ERROR";
+                console.error(e);
+            }
+        })
+        .withFailureHandler(error => {
+            $("task").textContent = "DOWNLOAD ERROR";
+            console.error(error);
+        })
+        .getVideoBase64();
+}
+
+function finishIfReady() {
+    if (!videoReady || finished) return;
+    finished = true;
+
+    progress = 100;
+    $("bar").style.width = "100%";
+    $("percent").textContent = "100%";
+    $("task").textContent = "INSTALLATION COMPLETE";
+
+    for (let i = 0; i < assets.length; i++) {
+        setAsset(i, "DONE");
+    }
+
+    $("downloaded").textContent =
+        totalSize.toFixed(1) + " / " + totalSize.toFixed(1) + " MB";
+
+    setTimeout(() => {
+        $("video-screen").style.display = "block";
+        $("installer").style.display = "none";
+
+        const video = $("video");
+        video.muted = false;
+        video.volume = 1;
+
+        video.play().catch(console.error);
+    }, 900);
+}
+
+function startInstallation() {
+    if (started) return;
+    started = true;
+
+    $("intro").style.display = "none";
+    $("loading").style.display = "block";
+
+    createAssets();
+
+    // Fetch the real video while the fake installation runs.
+    fetchVideo();
+
+    const interval = setInterval(() => {
+        if (progress < 94) {
+            progress += Math.random() * 1.1 + 0.25;
+
+            if (progress > 94) progress = 94;
+
+            const shown = Math.floor(progress);
+
+            $("bar").style.width = shown + "%";
+            $("percent").textContent = shown + "%";
+
+            const count = Math.floor(
+                progress / 100 * assets.length
+            );
+
+            while (assetIndex < count) {
+                setAsset(assetIndex, "DONE");
+                assetIndex++;
+            }
+
+            if (assetIndex < assets.length) {
+                setAsset(assetIndex, "INSTALLING...");
+            }
+
+            $("task").textContent =
+                assets[Math.min(assetIndex, assets.length - 1)][0];
+
+            $("downloaded").textContent =
+                (totalSize * progress / 100).toFixed(1) +
+                " / " + totalSize.toFixed(1) + " MB";
+
+            $("speed").textContent =
+                (Math.random() * 5 + 1).toFixed(1) + " MB/s";
+        }
+
+        if (videoReady) {
+            clearInterval(interval);
+            finishIfReady();
+        }
+
+    }, 350);
+}
+
+$("start").addEventListener("click", startInstallation);
+</script>
 
 </body>
 </html>
